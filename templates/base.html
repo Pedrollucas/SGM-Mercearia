@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SGM - Mercearia</title>
+    <style>
+      body{font-family: Arial, sans-serif; margin: 20px;}
+      nav a{margin-right: 10px}
+      table{border-collapse: collapse; width:100%}
+      th,td{border:1px solid #ddd;padding:8px}
+      .flash{background:#e7f5e6;padding:10px;margin-bottom:10px}
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="{{ url_for('main.listar_clientes') }}">Clientes</a>
+      <a href="{{ url_for('main.listar_dividas') }}">Dívidas</a>
+      <a href="{{ url_for('main.listar_usuarios') }}">Usuários</a>
+      <a href="{{ url_for('main.relatorio_dashboard') }}">Dashboard</a>
+    </nav>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for m in messages %}
+          <div class="flash">{{ m }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </body>
+</html>
