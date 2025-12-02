@@ -1,10 +1,10 @@
-# SGM-Mercearia 🏪
+# SGM-Mercearia 
 
 Sistema de Gerenciamento de Mercearia — aplicação web para controle de clientes, dívidas, pagamentos e relatórios financeiros.
 
 ---
 
-## 📋 Sobre o Projeto
+## Sobre o Projeto
 
 O **SGM-Mercearia** é um sistema desenvolvido para facilitar o gerenciamento de uma mercearia, permitindo:
 
@@ -26,7 +26,7 @@ O **SGM-Mercearia** é um sistema desenvolvido para facilitar o gerenciamento de
 
 ---
 
-## 🚀 Como Executar o Projeto
+##  Como Executar o Projeto
 
 ### Pré-requisitos
 
@@ -72,18 +72,18 @@ A aplicação estará disponível em: **http://127.0.0.1:5000**
 
 ---
 
-## 🔐 Login Inicial
+##  Login Inicial
 
 Na primeira execução, o sistema cria automaticamente um usuário administrador:
 
 - **Usuário**: `adm`
 - **Senha**: `adm`
 
-> ⚠️ **Importante**: Altere essa senha após o primeiro acesso para garantir a segurança do sistema.
+> **Importante**: Altere essa senha após o primeiro acesso para garantir a segurança do sistema.
 
 ---
 
-## 📂 Estrutura do Projeto
+##  Estrutura do Projeto
 
 ```
 SGM-Mercearia/
@@ -114,7 +114,7 @@ SGM-Mercearia/
 
 ---
 
-## 🧑‍💼 Funcionalidades por Perfil
+##  Funcionalidades por Perfil
 
 ### Caixista
 
@@ -132,7 +132,7 @@ SGM-Mercearia/
 
 ---
 
-## 📦 Dependências Principais
+##  Dependências Principais
 
 - **Flask** (3.1.2+): framework web
 - **Flask-SQLAlchemy** (3.1.1+): ORM para SQLite
@@ -142,7 +142,7 @@ Veja o arquivo `requirements.txt` para a lista completa.
 
 ---
 
-## 🛠️ Melhorias Futuras (Roadmap)
+##  Melhorias Futuras (Roadmap)
 
 - [ ] Proteção CSRF com Flask-WTF
 - [ ] Hashing de senha com bcrypt (mais seguro)
@@ -154,7 +154,7 @@ Veja o arquivo `requirements.txt` para a lista completa.
 
 ---
 
-## 👨‍💻 Autores
+##  Autores
 
 Desenvolvido por: 
 **Bruna Nunes** ([brun4nune5s](https://github.com/brun4nune5s)),
