@@ -59,10 +59,16 @@ class Divida(db.Model):
     descricao = db.Column(db.String(255), default='')  # Descrição dos itens
     status = db.Column(db.String(50), default='Pendente')  # Pendente, Paga, Renegociada
     saldo_devedor = db.Column(db.Float, nullable=False)  # Quanto ainda falta pagar
+    
+    # Campos de parcelamento
+    parcelado = db.Column(db.Boolean, default=False)  # Se foi parcelado
+    num_parcelas = db.Column(db.Integer, default=1)  # Quantidade de parcelas
+    juros_parcelamento = db.Column(db.Float, default=0.0)  # Juros aplicados no parcelamento
 
-    # Relacionamentos: uma dívida pode ter vários pagamentos e renegociações
+    # Relacionamentos: uma dívida pode ter vários pagamentos, renegociações e parcelas
     pagamentos = db.relationship('Pagamento', backref='divida', lazy=True, cascade='all, delete-orphan')
     renegociacoes = db.relationship('Renegociacao', backref='divida', lazy=True, cascade='all, delete-orphan')
+    parcelas = db.relationship('Parcela', backref='divida', lazy=True, cascade='all, delete-orphan')
 
     def aplicar_pagamento(self, pagamento):
         """Aplica um pagamento na dívida, reduzindo o saldo devedor"""
@@ -126,3 +132,18 @@ class Renegociacao(db.Model):
 
     def __repr__(self):
         return f"<Renegociacao - Novo vencimento: {self.nova_data_venc} - Juros: {self.juros_percent}%>"
+
+
+class Parcela(db.Model):
+    """Modelo de Parcela - representa uma parcela de uma dívida parcelada"""
+    
+    id = db.Column(db.Integer, primary_key=True)
+    divida_id = db.Column(db.Integer, db.ForeignKey('divida.id'), nullable=False)
+    numero_parcela = db.Column(db.Integer, nullable=False)  # 1, 2, 3...
+    valor_parcela = db.Column(db.Float, nullable=False)  # Valor da parcela
+    data_vencimento = db.Column(db.Date, nullable=False)  # Vencimento desta parcela
+    status = db.Column(db.String(50), default='Pendente')  # Pendente, Paga, Vencida
+    valor_pago = db.Column(db.Float, default=0.0)  # Quanto já foi pago desta parcela
+    
+    def __repr__(self):
+        return f"<Parcela {self.numero_parcela} - R${self.valor_parcela:.2f} - {self.status}>"

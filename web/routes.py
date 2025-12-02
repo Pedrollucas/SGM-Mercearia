@@ -13,7 +13,7 @@ Organização:
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
-from web.models import db, Cliente, Usuario, Divida, Pagamento, Renegociacao
+from web.models import db, Cliente, Usuario, Divida, Pagamento, Renegociacao, Parcela
 from datetime import datetime, date, timedelta
 from werkzeug.security import check_password_hash, generate_password_hash
 from collections import defaultdict
@@ -89,6 +89,10 @@ def register_routes(app):
         """
         tipo = session.get('user_tipo')
         
+        # Se vier com cliente_id, renderiza página vazia para o JavaScript preencher
+        if request.args.get('cliente_id'):
+            return render_template('home.html', dashboard=False, hide_aside=False)
+        
         if tipo == 'Administrador':
             # Carrega todos os dados necessários
             dividas = Divida.query.all()
@@ -102,6 +106,8 @@ def register_routes(app):
                 if d.status != 'Paga' and d.data_vencimento <= hoje
             )
             qtd_pagas = sum(1 for d in dividas if d.status == 'Paga')
+            qtd_vencidas = sum(1 for d in dividas if d.status != 'Paga' and d.data_vencimento < hoje)
+            qtd_abertas = sum(1 for d in dividas if d.status != 'Paga' and d.data_vencimento >= hoje)
 
             # ===== Ranking: Top 5 devedores =====
             ranking = {}
@@ -183,6 +189,8 @@ def register_routes(app):
                 total_a_receber=total_a_receber,
                 total_vencido=total_vencido,
                 qtd_pagas=qtd_pagas,
+                qtd_vencidas=qtd_vencidas,
+                qtd_abertas=qtd_abertas,
                 ranking=ranking_ordenado,
                 dividas_vencidas=dividas_vencidas,
                 # dados para gráficos
@@ -246,6 +254,17 @@ def register_routes(app):
                 for r in d.renegociacoes
             ]
             
+            parcelas = [
+                {
+                    'numero': p.numero_parcela,
+                    'valor_parcela': p.valor_parcela,
+                    'data_vencimento': p.data_vencimento.isoformat(),
+                    'status': p.status,
+                    'valor_pago': p.valor_pago
+                }
+                for p in d.parcelas
+            ]
+            
             dividas.append({
                 'id': d.id,
                 'valor_original': d.valor_original,
@@ -253,8 +272,12 @@ def register_routes(app):
                 'vencimento': d.data_vencimento.isoformat(),
                 'status': d.status,
                 'descricao': d.descricao,
+                'parcelado': d.parcelado,
+                'num_parcelas': d.num_parcelas,
+                'juros_parcelamento': d.juros_parcelamento,
                 'pagamentos': pagamentos,
-                'renegociacoes': reneg
+                'renegociacoes': reneg,
+                'parcelas': parcelas
             })
 
         # Monta resposta completa
@@ -308,7 +331,7 @@ def register_routes(app):
             db.session.commit()
             
             flash('Cliente cadastrado com sucesso.')
-            return redirect(url_for('main.listar_clientes'))
+            return redirect(url_for('main.home') + f'?cliente_id={cliente.id}')
 
         return render_template('clientes_form.html')
 
@@ -426,35 +449,70 @@ def register_routes(app):
             valor = float(request.form.get('valor'))
             descricao = request.form.get('descricao') or ''
             prazo = int(request.form.get('prazo') or 0)
+            num_parcelas = int(request.form.get('num_parcelas') or 1)
+            juros_parcelamento = float(request.form.get('juros_parcelamento') or 0.0)
 
             cliente = Cliente.query.get(cliente_id)
             if not cliente:
                 flash('Cliente não encontrado.')
                 return redirect(url_for('main.novo_divida'))
 
-            data_venc = date.today() + timedelta(days=prazo)
-
             # COMPORTAMENTO ACUMULATIVO:
             # Atualiza prazo de todas as dívidas pendentes para o mesmo prazo da nova
             usuario_nome = session.get('user_nome', 'Sistema')
             pendentes = Divida.query.filter_by(cliente_id=cliente.id)\
                                     .filter(Divida.status != 'Paga').all()
-            for d in pendentes:
-                d.renegociar(data_venc, 0.0, usuario_nome)  # 0% de juros, apenas prorroga
-
+            
+            # Calcula valor total com juros (se parcelado)
+            valor_total = valor
+            if num_parcelas > 1 and juros_parcelamento > 0:
+                valor_total = valor * (1 + juros_parcelamento / 100)
+            
             # Cria nova dívida
             divida = Divida(
                 cliente_id=cliente.id,
                 valor_original=valor,
-                saldo_devedor=valor,
-                data_vencimento=data_venc,
-                descricao=descricao
+                saldo_devedor=valor_total,
+                data_vencimento=date.today() + timedelta(days=prazo),
+                descricao=descricao,
+                parcelado=(num_parcelas > 1),
+                num_parcelas=num_parcelas,
+                juros_parcelamento=juros_parcelamento if num_parcelas > 1 else 0.0
             )
             db.session.add(divida)
+            db.session.flush()  # Garante que divida.id está disponível
+            
+            # Se parcelado, cria as parcelas
+            if num_parcelas > 1:
+                from web.models import Parcela
+                valor_parcela = valor_total / num_parcelas
+                dias_entre_parcelas = prazo // num_parcelas if prazo > 0 else 30
+                
+                for i in range(1, num_parcelas + 1):
+                    vencimento_parcela = date.today() + timedelta(days=dias_entre_parcelas * i)
+                    parcela = Parcela(
+                        divida_id=divida.id,
+                        numero_parcela=i,
+                        valor_parcela=valor_parcela,
+                        data_vencimento=vencimento_parcela,
+                        status='Pendente'
+                    )
+                    db.session.add(parcela)
+                
+                # Atualiza data de vencimento da dívida para a última parcela
+                divida.data_vencimento = date.today() + timedelta(days=dias_entre_parcelas * num_parcelas)
+            
+            # Renegocia dívidas pendentes (após criar a nova)
+            for d in pendentes:
+                d.renegociar(divida.data_vencimento, 0.0, usuario_nome)
+            
             db.session.commit()
             
-            flash('Dívida registrada com sucesso.')
-            return redirect(url_for('main.home'))
+            if num_parcelas > 1:
+                flash(f'Dívida registrada com sucesso! Parcelada em {num_parcelas}x de R$ {valor_parcela:.2f}')
+            else:
+                flash('Dívida registrada com sucesso.')
+            return redirect(url_for('main.home') + f'?cliente_id={cliente_id}')
 
         return render_template(
             'dividas_form.html',
@@ -496,7 +554,7 @@ def register_routes(app):
             db.session.commit()
             
             flash('Pagamento registrado com sucesso.')
-            return redirect(url_for('main.home'))
+            return redirect(url_for('main.home') + f'?cliente_id={divida.cliente_id}')
 
         return render_template('pagamentos_form.html', dividas=dividas, cliente=cliente)
 
@@ -543,7 +601,7 @@ def register_routes(app):
             db.session.commit()
             
             flash('Dívida renegociada com sucesso.')
-            return redirect(url_for('main.home'))
+            return redirect(url_for('main.home') + f'?cliente_id={divida.cliente_id}')
         
         return render_template('renegociar_form.html', divida=divida)
 

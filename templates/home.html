@@ -16,8 +16,35 @@
 </div>
 <div class="grid two" style="margin-top: 10px">
   <div class="card">
-    <div class="muted" style="font-size: 0.85rem">Dívidas Quitadas</div>
-    <div style="font-size: 1.6rem; font-weight: 800">{{ qtd_pagas }}</div>
+    <div class="muted" style="font-size: 0.85rem; margin-bottom: 12px">
+      Resumo de Dívidas
+    </div>
+    <div class="grid two" style="gap: 16px">
+      <div>
+        <div style="font-size: 0.75rem; color: var(--muted)">Quitadas</div>
+        <div style="font-size: 1.4rem; font-weight: 700; color: #28a745">
+          {{ qtd_pagas }}
+        </div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: var(--muted)">Abertas</div>
+        <div style="font-size: 1.4rem; font-weight: 700; color: #3b82f6">
+          {{ qtd_abertas }}
+        </div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: var(--muted)">Vencidas</div>
+        <div style="font-size: 1.4rem; font-weight: 700; color: #dc3545">
+          {{ qtd_vencidas }}
+        </div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: var(--muted)">Total</div>
+        <div style="font-size: 1.4rem; font-weight: 700">
+          {{ qtd_pagas + qtd_abertas + qtd_vencidas }}
+        </div>
+      </div>
+    </div>
   </div>
   <div class="card">
     <div class="muted" style="font-size: 0.85rem">Status das Dívidas</div>
@@ -47,7 +74,7 @@
   </h3>
   {% if dividas_vencidas %}
   <div style="max-height: 400px; overflow-y: auto">
-    <table style="width: 100%; border-collapse: collapse">
+    <table id="tabelaVencidas" style="width: 100%; border-collapse: collapse">
       <thead>
         <tr style="background: #f7fafc; position: sticky; top: 0">
           <th
@@ -56,9 +83,12 @@
               text-align: left;
               font-size: 0.85rem;
               color: var(--muted);
+              cursor: pointer;
+              user-select: none;
             "
+            onclick="ordenarTabela('cliente')"
           >
-            Cliente
+            Cliente <span id="sortCliente">⇅</span>
           </th>
           <th
             style="
@@ -76,9 +106,12 @@
               text-align: right;
               font-size: 0.85rem;
               color: var(--muted);
+              cursor: pointer;
+              user-select: none;
             "
+            onclick="ordenarTabela('saldo')"
           >
-            Saldo
+            Saldo <span id="sortSaldo">⇅</span>
           </th>
           <th
             style="
@@ -86,15 +119,23 @@
               text-align: center;
               font-size: 0.85rem;
               color: var(--muted);
+              cursor: pointer;
+              user-select: none;
             "
+            onclick="ordenarTabela('vencimento')"
           >
-            Vencimento
+            Vencimento <span id="sortVencimento">⇅</span>
           </th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="tbodyVencidas">
         {% for dv in dividas_vencidas %}
-        <tr style="border-top: 1px solid #f1f5f9">
+        <tr
+          style="border-top: 1px solid #f1f5f9"
+          data-cliente="{{ dv.cliente_nome }}"
+          data-saldo="{{ dv.saldo }}"
+          data-vencimento="{{ dv.vencimento.strftime('%Y-%m-%d') }}"
+        >
           <td style="padding: 10px"><strong>{{ dv.cliente_nome }}</strong></td>
           <td style="padding: 10px; color: var(--muted)">{{ dv.descricao }}</td>
           <td
@@ -134,6 +175,57 @@
   const meioValues = {{ meio_values|tojson|safe }};
   const monthLabels = {{ month_labels|tojson|safe }};
   const monthValues = {{ month_values|tojson|safe }};
+
+  // Sistema de ordenação da tabela de dívidas vencidas
+  let ordenacaoAtual = { coluna: null, ordem: 'asc' };
+
+  function ordenarTabela(coluna) {
+    const tbody = document.getElementById('tbodyVencidas');
+    const linhas = Array.from(tbody.querySelectorAll('tr'));
+
+    // Define ordem: se mesma coluna, alterna; se nova coluna, começa crescente
+    if (ordenacaoAtual.coluna === coluna) {
+      ordenacaoAtual.ordem = ordenacaoAtual.ordem === 'asc' ? 'desc' : 'asc';
+    } else {
+      ordenacaoAtual.coluna = coluna;
+      ordenacaoAtual.ordem = 'asc';
+    }
+
+    // Ordena as linhas
+    linhas.sort((a, b) => {
+      let valorA, valorB;
+
+      if (coluna === 'cliente') {
+        valorA = a.dataset.cliente.toLowerCase();
+        valorB = b.dataset.cliente.toLowerCase();
+      } else if (coluna === 'saldo') {
+        valorA = parseFloat(a.dataset.saldo);
+        valorB = parseFloat(b.dataset.saldo);
+      } else if (coluna === 'vencimento') {
+        valorA = new Date(a.dataset.vencimento);
+        valorB = new Date(b.dataset.vencimento);
+      }
+
+      let comparacao = 0;
+      if (valorA < valorB) comparacao = -1;
+      if (valorA > valorB) comparacao = 1;
+
+      return ordenacaoAtual.ordem === 'asc' ? comparacao : -comparacao;
+    });
+
+    // Reinsere linhas ordenadas
+    linhas.forEach(linha => tbody.appendChild(linha));
+
+    // Atualiza indicadores visuais
+    document.getElementById('sortCliente').textContent = '⇅';
+    document.getElementById('sortSaldo').textContent = '⇅';
+    document.getElementById('sortVencimento').textContent = '⇅';
+
+    const indicador = ordenacaoAtual.ordem === 'asc' ? '↓' : '↑';
+    if (coluna === 'cliente') document.getElementById('sortCliente').textContent = indicador;
+    if (coluna === 'saldo') document.getElementById('sortSaldo').textContent = indicador;
+    if (coluna === 'vencimento') document.getElementById('sortVencimento').textContent = indicador;
+  }
 
   // Chart helpers
   const colors = {

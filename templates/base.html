@@ -595,12 +595,8 @@
                 <div class="muted">Endereço: ${data.endereco || "-"}</div>
               </div>
               <div class="row">
-                <button class='btn' onclick="location.href='/dividas/novo?cliente_id=${
-                  data.id
-                }'">Lançar Dívida</button>
-                <button class='btn outline' onclick="location.href='/pagamentos/novo?cliente_id=${
-                  data.id
-                }'">Lançar Pagamento</button>
+                <button class="btn" onclick="location.href='/dividas/novo?cliente_id=${data.id}'">Lançar Dívida</button>
+                <button class="btn outline" onclick="location.href='/pagamentos/novo?cliente_id=${data.id}'">Lançar Pagamento</button>
               </div>
             </div>
           </div>`;
@@ -630,7 +626,20 @@
 
             html += `<div class="card" style="margin:10px 0;">
                 <div class="row between" style="margin-bottom:6px;">
-                  <div><strong>${d.descricao || "Sem descrição"}</strong></div>
+                  <div>
+                    <strong>${d.descricao || "Sem descrição"}</strong>
+                    ${
+                      d.parcelado
+                        ? `<span class="badge info" style="margin-left:8px;">${
+                            d.num_parcelas
+                          }x ${
+                            d.juros_parcelamento > 0
+                              ? "(+" + d.juros_parcelamento + "% juros)"
+                              : ""
+                          }</span>`
+                        : ""
+                    }
+                  </div>
                   <span class="${badgeClass}">${badgeText}</span>
                 </div>
                 <div class="grid two" style="align-items:flex-start;">
@@ -676,6 +685,41 @@
                             r.nova_data_venc
                           )} (+${r.juros}%)</div>`
                       )
+                      .join("")}
+                  </div>`
+                    : ""
+                }
+                ${
+                  d.parcelas && d.parcelas.length > 0
+                    ? `<div style="margin-top:12px; border-top:1px solid #eee; padding-top:10px;">
+                    <div class="muted" style="font-size:.85rem; margin-bottom:8px;">📋 Parcelas:</div>
+                    ${d.parcelas
+                      .map((p) => {
+                        const statusColors = {
+                          Pendente: "#ffc107",
+                          Paga: "#28a745",
+                          Vencida: "#dc3545",
+                        };
+                        const statusColor = statusColors[p.status] || "#6c757d";
+                        return `<div style="font-size:.8rem; margin:4px 0; padding:6px; background:#f8f9fa; border-radius:4px;">
+                          <div class="row between" style="align-items:center;">
+                            <div><strong>Parcela ${
+                              p.numero
+                            }</strong> - R$ ${fmtMoney(p.valor_parcela)}</div>
+                            <span style="font-size:.75rem; color:${statusColor}; font-weight:600;">● ${
+                          p.status
+                        }</span>
+                          </div>
+                          <div class="muted" style="font-size:.75rem; margin-top:2px;">
+                            Vencimento: ${fmtDate(p.data_vencimento)}
+                            ${
+                              p.valor_pago > 0
+                                ? ` | Pago: R$ ${fmtMoney(p.valor_pago)}`
+                                : ""
+                            }
+                          </div>
+                        </div>`;
+                      })
                       .join("")}
                   </div>`
                     : ""
@@ -780,6 +824,19 @@
           });
         }
         fetchClients();
+        
+        // Verifica se há cliente_id na URL para carregar automaticamente
+        // MAS APENAS se estiver na página /home
+        const urlParams = new URLSearchParams(window.location.search);
+        const clienteId = urlParams.get('cliente_id');
+        const isHomePage = window.location.pathname === '/home';
+        
+        if (clienteId && isHomePage) {
+          // Pequeno delay para garantir que DOM está pronto
+          setTimeout(() => {
+            loadClient(parseInt(clienteId));
+          }, 100);
+        }
       });
     </script>
 
